@@ -1,0 +1,80 @@
+#!/bin/bash
+
+# Set variables
+RESOURCE_GROUP_NAME="myResourceGroup"
+AKS_CLUSTER_NAME="myAKSCluster"
+LOCATION="eastus"
+SP_NAME="myServicePrincipal"
+SP_PASSWORD="myServicePrincipalPassword"
+
+# Create Azure resource group
+az group create --name $RESOURCE_GROUP_NAME --location $LOCATION
+
+# Create AKS Cluster
+az aks create \
+  --resource-group $RESOURCE_GROUP_NAME \
+  --name $AKS_CLUSTER_NAME \
+  --node-count 2 \
+  --enable-addons monitoring \
+  --generate-ssh-keys \
+  --location $LOCATION \
+  --service-principal $SP_NAME \
+  --client-secret $SP_PASSWORD
+
+# Get AKS credentials
+az aks get-credentials --resource-group $RESOURCE_GROUP_NAME --name $AKS_CLUSTER_NAME
+
+# Install Helm
+kubectl apply -f https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+
+# Install ArgoCD
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+# Expose ArgoCD API Server
+kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
+
+# Wait for the external IP to be assigned
+echo "Waiting for the external IP..."
+while [[ -z $(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].ip}') ]]; do
+    sleep 5
+done
+
+# Get ArgoCD credentials
+ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+ARGOCD_EXTERNAL_IP=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+echo "ArgoCD is accessible at: http://$ARGOCD_EXTERNAL_IP"
+echo "Username: admin"
+echo "Password: $ARGOCD_PASSWORD"
+
+# Install Traefik Ingress Controller
+kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v2.5/examples/k8s/traefik-rbac.yaml
+kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v2.5/examples/k8s/traefik-deployment.yaml
+
+# Expose Traefik Dashboard
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-dashboard
+  namespace: default
+spec:
+  selector:
+    app: traefik
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: LoadBalancer
+EOF
+
+# Wait for the external IP to be assigned
+echo "Waiting for the Traefik Dashboard external IP..."
+while [[ -z $(kubectl get svc traefik-dashboard -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}') ]]; do
+    sleep 5
+done
+
+# Get Traefik Dashboard external IP
+TRAEFIK_EXTERNAL_IP=$(kubectl get svc traefik-dashboard -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "Traefik Dashboard is accessible at: http://$TRAEFIK_EXTERNAL_IP:8080"
