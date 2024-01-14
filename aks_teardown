@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Set variables
+RESOURCE_GROUP_NAME="myResourceGroup"
+AKS_CLUSTER_NAME="myAKSCluster"
+SP_NAME="http://myAKSServicePrincipal"
+
+# Delete AKS cluster
+az aks delete --resource-group $RESOURCE_GROUP_NAME --name $AKS_CLUSTER_NAME --yes --no-wait
+
+# Delete Service Principal
+az ad sp delete --id http://myAKSServicePrincipal
+
+# Delete Resource Group
+az group delete --name $RESOURCE_GROUP_NAME --yes --no-wait
+
+# Optionally, you may want to clean up the local configuration
+# by removing the Azure Kubernetes Service context from kubectl
+kubectl config delete-context $AKS_CLUSTER_NAME
+kubectl config delete-cluster $AKS_CLUSTER_NAME
+
+echo "Cleanup completed. Resources have been deleted."
