@@ -7,10 +7,6 @@ AKS_CLUSTER_NAME="<YourAKSClusterName>"
 # Azure Region
 LOCATION="<YourAzureRegion>"
 
-# Azure Active Directory (AAD) Service Principal details
-SP_NAME="<YourServicePrincipalName>"
-SP_PASSWORD="<YourServicePrincipalPassword>"
-
 # Create Azure Resource Group
 az group create --name $RESOURCE_GROUP_NAME --location $LOCATION
 
@@ -22,8 +18,6 @@ az aks create \
   --enable-addons monitoring \
   --generate-ssh-keys \
   --location $LOCATION \
-  --service-principal $SP_NAME \
-  --client-secret $SP_PASSWORD
 
 # Get AKS Credentials
 az aks get-credentials --resource-group $RESOURCE_GROUP_NAME --name $AKS_CLUSTER_NAME
