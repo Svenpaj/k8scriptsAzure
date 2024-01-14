@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Azure Resource Group and AKS Cluster Name
+RESOURCE_GROUP_NAME="<YourResourceGroupName>"
+AKS_CLUSTER_NAME="<YourAKSClusterName>"
+
+# Azure Region
+LOCATION="<YourAzureRegion>"
+
+# Azure Active Directory (AAD) Service Principal details
+SP_NAME="<YourServicePrincipalName>"
+SP_PASSWORD="<YourServicePrincipalPassword>"
+
+# Create Azure Resource Group
+az group create --name $RESOURCE_GROUP_NAME --location $LOCATION
+
+# Create AKS Cluster
+az aks create \
+  --resource-group $RESOURCE_GROUP_NAME \
+  --name $AKS_CLUSTER_NAME \
+  --node-count 2 \
+  --enable-addons monitoring \
+  --generate-ssh-keys \
+  --location $LOCATION \
+  --service-principal $SP_NAME \
+  --client-secret $SP_PASSWORD
+
+# Get AKS Credentials
+az aks get-credentials --resource-group $RESOURCE_GROUP_NAME --name $AKS_CLUSTER_NAME
+
+# Verify the Kubernetes cluster
+kubectl get nodes
+
+# Install kubectl if not already installed
+# For Linux:
+# sudo az aks install-cli
+
+# For macOS:
+# brew install kubectl
+
+# For Windows:
+# Install from https://kubernetes.io/docs/tasks/tools/install-kubectl-windows/
+
+# Optional: Install Helm (Kubernetes package manager)
+# For Linux:
+# sudo snap install helm --classic
+
+# For macOS:
+# brew install helm
+
+# For Windows:
+# Download and install from https://helm.sh/docs/intro/install/
+
+# Install ArgoCD
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+# Expose ArgoCD Service
+kubectl expose service argocd-server -n argocd --type=LoadBalancer --name=argocd-server-lb
+
+# Install Traefik using Helm
+helm repo add traefik https://helm.traefik.io/traefik
+helm repo update
+helm install traefik traefik/traefik --namespace kube-system
+
+# Expose Traefik Dashboard
+kubectl expose service traefik --namespace kube-system --type=LoadBalancer --name=traefik-dashboard-lb --port=8080
+
+# Display AKS Cluster Information
+az aks show --resource-group $RESOURCE_GROUP_NAME --name $AKS_CLUSTER_NAME --output table
+
+# Display ArgoCD and Traefik Services External IP addresses
+echo "ArgoCD is available at: http://$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].ip}')"
+echo "Traefik Dashboard is available at: http://$(kubectl get svc traefik --namespace kube-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}'):8080"
+
+echo "Kubernetes cluster in Azure, ArgoCD, Helm, and Traefik have been set up successfully!"
