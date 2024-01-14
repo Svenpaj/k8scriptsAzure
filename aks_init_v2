@@ -4,8 +4,6 @@
 RESOURCE_GROUP_NAME="myResourceGroup"
 AKS_CLUSTER_NAME="myAKSCluster"
 LOCATION="eastus"
-SP_NAME="myServicePrincipal"
-SP_PASSWORD="myServicePrincipalPassword"
 
 # Create Azure resource group
 az group create --name $RESOURCE_GROUP_NAME --location $LOCATION
@@ -18,8 +16,6 @@ az aks create \
   --enable-addons monitoring \
   --generate-ssh-keys \
   --location $LOCATION \
-  --service-principal $SP_NAME \
-  --client-secret $SP_PASSWORD
 
 # Get AKS credentials
 az aks get-credentials --resource-group $RESOURCE_GROUP_NAME --name $AKS_CLUSTER_NAME
@@ -78,3 +74,10 @@ done
 # Get Traefik Dashboard external IP
 TRAEFIK_EXTERNAL_IP=$(kubectl get svc traefik-dashboard -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 echo "Traefik Dashboard is accessible at: http://$TRAEFIK_EXTERNAL_IP:8080"
+
+# Verify the Kubernetes cluster
+kubectl get nodes
+
+az aks show --resource-group $RESOURCE_GROUP_NAME --name $AKS_CLUSTER_NAME --output table
+
+echo "Kubernetes cluster in Azure has been set up successfully!"
